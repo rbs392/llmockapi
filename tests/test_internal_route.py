@@ -30,7 +30,8 @@ class TestInternalRoutes:
         response = await messages(request)
 
         # Should return JSONResponse with messages
-        assert response.body.decode() == json.dumps(test_messages)
+        # Parse both as JSON to compare content, not formatting
+        assert json.loads(response.body.decode()) == test_messages
 
     @pytest.mark.asyncio
     async def test_messages_endpoint_empty_state(self):
@@ -54,9 +55,8 @@ class TestInternalRoutes:
 
         template_content = "<html><script>const chatData = [];</script></html>"
 
-        with patch(
-            "llmockapi.config.config.get_chat_template", return_value=template_content
-        ):
+        with patch("llmockapi.internal_route.config") as mock_config:
+            mock_config.get_chat_template.return_value = template_content
             response = await ui(request)
 
             # Should be HTMLResponse
@@ -64,10 +64,10 @@ class TestInternalRoutes:
             assert response.media_type == "text/html"
 
             # Should inject chat data
-            body = response.body.decode()
-            assert "const chatData = [" in body
-            assert '"role": "user"' in body
-            assert '"role": "assistant"' in body
+            body = response.body
+            assert b"const chatData = [" in body
+            assert b'"role": "user"' in body or b'"role":"user"' in body
+            assert b'"role": "assistant"' in body or b'"role":"assistant"' in body
 
     @pytest.mark.asyncio
     async def test_ui_endpoint_escapes_json_properly(self):
@@ -79,14 +79,13 @@ class TestInternalRoutes:
 
         template_content = "const chatData = [];"
 
-        with patch(
-            "llmockapi.config.config.get_chat_template", return_value=template_content
-        ):
+        with patch("llmockapi.internal_route.config") as mock_config:
+            mock_config.get_chat_template.return_value = template_content
             response = await ui(request)
 
-            body = response.body.decode()
+            body = response.body
             # Should contain valid JSON
-            assert "const chatData = [" in body
+            assert b"const chatData = [" in body
 
     @pytest.mark.asyncio
     async def test_ui_endpoint_with_complex_messages(self):
@@ -105,15 +104,14 @@ class TestInternalRoutes:
 
         template_content = "<div>const chatData = [];</div>"
 
-        with patch(
-            "llmockapi.config.config.get_chat_template", return_value=template_content
-        ):
+        with patch("llmockapi.internal_route.config") as mock_config:
+            mock_config.get_chat_template.return_value = template_content
             response = await ui(request)
 
-            body = response.body.decode()
-            assert "const chatData = [" in body
+            body = response.body
+            assert b"const chatData = [" in body
             # Original placeholder should be replaced
-            assert "const chatData = [];" not in body
+            assert b"const chatData = [];" not in body
 
 
 @pytest.mark.integration

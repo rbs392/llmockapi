@@ -3,6 +3,7 @@ import pytest
 from unittest.mock import AsyncMock, patch, MagicMock
 from fastapi.testclient import TestClient
 from llmockapi import app
+from conftest import create_mock_aiohttp_session
 
 
 @pytest.mark.integration
@@ -27,12 +28,10 @@ class TestAppIntegration:
 
     def test_favicon_request_bypassed(self, test_client):
         """Test that favicon requests are handled."""
-        with patch(
-            "llmockapi.middleware.MockResponseMiddleWare.__call__"
-        ) as mock_middleware:
-            response = test_client.get("/favicon.ico")
-            # Middleware should be called and pass through
-            assert mock_middleware.called or response.status_code in [200, 404]
+        # Just test that favicon doesn't error out
+        response = test_client.get("/favicon.ico")
+        # Favicon should return 404 (not found) or be bypassed without error
+        assert response.status_code in [200, 404]
 
     def test_internal_routes_bypass_llm(self, test_client):
         """Test that internal routes don't use LLM client."""
@@ -47,11 +46,9 @@ class TestAppIntegration:
     @pytest.mark.asyncio
     async def test_api_route_uses_llm(self, test_client, mock_llm_response):
         """Test that API routes use LLM for response generation."""
-        with patch("aiohttp.ClientSession") as mock_session:
-            mock_response = AsyncMock()
-            mock_response.json = AsyncMock(return_value=mock_llm_response)
-            mock_session.return_value.__aenter__.return_value.post.return_value.__aenter__.return_value = mock_response
+        mock_session = create_mock_aiohttp_session(mock_llm_response)
 
+        with patch("aiohttp.ClientSession", return_value=mock_session):
             # This should trigger LLM middleware
             response = test_client.get("/pet/123")
 
@@ -73,11 +70,9 @@ class TestAppIntegration:
 
     def test_multiple_requests_share_conversation(self, test_client, mock_llm_response):
         """Test that multiple requests maintain conversation history."""
-        with patch("aiohttp.ClientSession") as mock_session:
-            mock_response = AsyncMock()
-            mock_response.json = AsyncMock(return_value=mock_llm_response)
-            mock_session.return_value.__aenter__.return_value.post.return_value.__aenter__.return_value = mock_response
+        mock_session = create_mock_aiohttp_session(mock_llm_response)
 
+        with patch("aiohttp.ClientSession", return_value=mock_session):
             # Make first request
             test_client.get("/pet/1")
 
@@ -110,11 +105,8 @@ class TestAppIntegration:
 
     def test_different_http_methods(self, test_client, mock_llm_response):
         """Test that different HTTP methods are handled."""
-        with patch("aiohttp.ClientSession") as mock_session:
-            mock_response = AsyncMock()
-            mock_response.json = AsyncMock(return_value=mock_llm_response)
-            mock_session.return_value.__aenter__.return_value.post.return_value.__aenter__.return_value = mock_response
-
+        mock_session = create_mock_aiohttp_session(mock_llm_response)
+        with patch("aiohttp.ClientSession", return_value=mock_session):
             # Test different methods
             methods = [
                 ("GET", "/pet/1"),
@@ -144,11 +136,9 @@ class TestEndToEndFlow:
     @pytest.mark.asyncio
     async def test_complete_request_flow(self, test_client, mock_llm_response):
         """Test complete request flow from request to response."""
-        with patch("aiohttp.ClientSession") as mock_session:
+        mock_session = create_mock_aiohttp_session(mock_llm_response)
+        with patch("aiohttp.ClientSession", return_value=mock_session):
             # Setup mock LLM response
-            mock_response = AsyncMock()
-            mock_response.json = AsyncMock(return_value=mock_llm_response)
-            mock_session.return_value.__aenter__.return_value.post.return_value.__aenter__.return_value = mock_response
 
             # 1. Check initial state
             response = test_client.get("/__internal/health")
@@ -177,11 +167,8 @@ class TestEndToEndFlow:
 
     def test_ui_displays_conversation(self, test_client, mock_llm_response):
         """Test that UI endpoint displays conversation history."""
-        with patch("aiohttp.ClientSession") as mock_session:
-            mock_response = AsyncMock()
-            mock_response.json = AsyncMock(return_value=mock_llm_response)
-            mock_session.return_value.__aenter__.return_value.post.return_value.__aenter__.return_value = mock_response
-
+        mock_session = create_mock_aiohttp_session(mock_llm_response)
+        with patch("aiohttp.ClientSession", return_value=mock_session):
             # Make a request
             test_client.get("/pet/123")
 

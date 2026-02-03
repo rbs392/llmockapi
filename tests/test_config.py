@@ -1,8 +1,9 @@
 import json
 import pytest
 from pathlib import Path
-from unittest.mock import AsyncMock, patch, mock_open
+from unittest.mock import AsyncMock, patch, mock_open, MagicMock
 from llmockapi.config import Config, SYSTEM_PROMPT
+from conftest import create_mock_aiohttp_session
 
 
 @pytest.mark.unit
@@ -50,11 +51,9 @@ class TestConfig:
         mock_config.mock_api_spec = "https://example.com/spec.json"
         test_spec = '{"swagger": "2.0", "info": {"title": "Test API"}}'
 
-        with patch("aiohttp.ClientSession") as mock_session:
-            mock_response = AsyncMock()
-            mock_response.text = AsyncMock(return_value=test_spec)
-            mock_session.return_value.__aenter__.return_value.get.return_value.__aenter__.return_value = mock_response
+        mock_session = create_mock_aiohttp_session(test_spec)
 
+        with patch("aiohttp.ClientSession", return_value=mock_session):
             result = await mock_config.get_http_spec()
             assert result == test_spec
 
@@ -124,7 +123,9 @@ info:
         )
 
         test_spec = '{"test": "spec"}'
-        with patch.object(config, "get_http_spec", AsyncMock(return_value=test_spec)):
+        mock_session = create_mock_aiohttp_session(test_spec)
+
+        with patch("aiohttp.ClientSession", return_value=mock_session):
             result = await config.get_api_spec()
             assert result == test_spec
 

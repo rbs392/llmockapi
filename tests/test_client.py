@@ -5,6 +5,7 @@ from fastapi import Request, Response
 from fastapi.datastructures import Headers
 from llmockapi.client import LLMClient
 from llmockapi.config import Config
+from conftest import create_mock_aiohttp_session
 
 
 @pytest.mark.unit
@@ -110,11 +111,20 @@ class TestLLMClient:
         """Test that get_response constructs the request in proper HTTP format."""
         client = LLMClient(config=mock_config)
 
-        with patch("aiohttp.ClientSession") as mock_session:
-            mock_response = AsyncMock()
-            mock_response.json = AsyncMock(return_value=mock_llm_response)
-            mock_session.return_value.__aenter__.return_value.post.return_value.__aenter__.return_value = mock_response
+        # Create properly mocked aiohttp session
+        mock_response = AsyncMock()
+        mock_response.json = AsyncMock(return_value=mock_llm_response)
 
+        mock_post_ctx = AsyncMock()
+        mock_post_ctx.__aenter__ = AsyncMock(return_value=mock_response)
+        mock_post_ctx.__aexit__ = AsyncMock(return_value=None)
+
+        mock_session = AsyncMock()
+        mock_session.post = MagicMock(return_value=mock_post_ctx)
+        mock_session.__aenter__ = AsyncMock(return_value=mock_session)
+        mock_session.__aexit__ = AsyncMock(return_value=None)
+
+        with patch("aiohttp.ClientSession", return_value=mock_session):
             response = await client.get_response(mock_request)
 
             # Verify the message was added to state
@@ -133,18 +143,14 @@ class TestLLMClient:
         """Test that get_response sends request to LLM API."""
         client = LLMClient(config=mock_config)
 
-        with patch("aiohttp.ClientSession") as mock_session:
-            mock_post = AsyncMock()
-            mock_response = AsyncMock()
-            mock_response.json = AsyncMock(return_value=mock_llm_response)
-            mock_post.return_value.__aenter__.return_value = mock_response
-            mock_session.return_value.__aenter__.return_value.post = mock_post
+        mock_session = create_mock_aiohttp_session(mock_llm_response)
 
+        with patch("aiohttp.ClientSession", return_value=mock_session):
             await client.get_response(mock_request)
 
             # Verify API was called
-            mock_post.assert_called_once()
-            call_args = mock_post.call_args
+            mock_session.post.assert_called_once()
+            call_args = mock_session.post.call_args
 
             # Verify correct endpoint
             assert call_args[0][0] == "v1/chat/completions"
@@ -161,11 +167,9 @@ class TestLLMClient:
         """Test that get_response returns a proper FastAPI Response."""
         client = LLMClient(config=mock_config)
 
-        with patch("aiohttp.ClientSession") as mock_session:
-            mock_response = AsyncMock()
-            mock_response.json = AsyncMock(return_value=mock_llm_response)
-            mock_session.return_value.__aenter__.return_value.post.return_value.__aenter__.return_value = mock_response
+        mock_session = create_mock_aiohttp_session(mock_llm_response)
 
+        with patch("aiohttp.ClientSession", return_value=mock_session):
             response = await client.get_response(mock_request)
 
             assert isinstance(response, Response)
@@ -179,11 +183,9 @@ class TestLLMClient:
         """Test that get_response uses asyncio lock."""
         client = LLMClient(config=mock_config)
 
-        with patch("aiohttp.ClientSession") as mock_session:
-            mock_response = AsyncMock()
-            mock_response.json = AsyncMock(return_value=mock_llm_response)
-            mock_session.return_value.__aenter__.return_value.post.return_value.__aenter__.return_value = mock_response
+        mock_session = create_mock_aiohttp_session(mock_llm_response)
 
+        with patch("aiohttp.ClientSession", return_value=mock_session):
             with patch.object(
                 client.lock, "acquire", wraps=client.lock.acquire
             ) as mock_acquire:
@@ -206,11 +208,9 @@ class TestLLMClient:
         )
         request.state.messages = []
 
-        with patch("aiohttp.ClientSession") as mock_session:
-            mock_response = AsyncMock()
-            mock_response.json = AsyncMock(return_value=mock_llm_response)
-            mock_session.return_value.__aenter__.return_value.post.return_value.__aenter__.return_value = mock_response
+        mock_session = create_mock_aiohttp_session(mock_llm_response)
 
+        with patch("aiohttp.ClientSession", return_value=mock_session):
             await client.get_response(request)
 
             user_message = request.state.messages[0]
@@ -225,11 +225,9 @@ class TestLLMClient:
         """Test that get_response stores both user and assistant messages."""
         client = LLMClient(config=mock_config)
 
-        with patch("aiohttp.ClientSession") as mock_session:
-            mock_response = AsyncMock()
-            mock_response.json = AsyncMock(return_value=mock_llm_response)
-            mock_session.return_value.__aenter__.return_value.post.return_value.__aenter__.return_value = mock_response
+        mock_session = create_mock_aiohttp_session(mock_llm_response)
 
+        with patch("aiohttp.ClientSession", return_value=mock_session):
             await client.get_response(mock_request)
 
             # Should have user message and assistant message
@@ -251,11 +249,9 @@ class TestLLMClient:
         request.body = AsyncMock(return_value=b"")
         request.state.messages = []
 
-        with patch("aiohttp.ClientSession") as mock_session:
-            mock_response = AsyncMock()
-            mock_response.json = AsyncMock(return_value=mock_llm_response)
-            mock_session.return_value.__aenter__.return_value.post.return_value.__aenter__.return_value = mock_response
+        mock_session = create_mock_aiohttp_session(mock_llm_response)
 
+        with patch("aiohttp.ClientSession", return_value=mock_session):
             await client.get_response(request)
 
             user_message = request.state.messages[0]
