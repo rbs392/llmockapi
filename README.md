@@ -198,10 +198,6 @@ llmockapi
 
 See the LICENSE file for details.
 
-## Author
-
-rbs392 (rbs392@yahoo.com)
-
 ## Contributing
 
 Contributions are welcome! Please feel free to submit a Pull Request.
