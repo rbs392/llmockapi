@@ -3,8 +3,9 @@ name = "llmockapi"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
+license = { text = "MIT" }
 authors = [
-    { name = "rbs392", email = "rbs392@yahoo.com" }
+    { name = "rbs392" }
 ]
 requires-python = ">=3.12"
 dependencies = [
